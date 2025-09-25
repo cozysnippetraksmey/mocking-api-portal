@@ -1,0 +1,353 @@
+<div class="mocking-portal">
+  <!-- Loading Overlay -->
+  @if (loading()) {
+    <div class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <p>Loading...</p>
+    </div>
+  }
+
+  <!-- Authentication Section -->
+  @if (!isAuthenticated()) {
+    <div class="auth-section">
+      <div class="auth-card">
+        <h2>Mocking API Portal</h2>
+        <p>Please authenticate to access the mocking service</p>
+        
+        <form [formGroup]="authForm" (ngSubmit)="onLogin()" class="auth-form">
+          <div class="form-group">
+            <label for="username">Username:</label>
+            <input 
+              id="username"
+              type="text" 
+              formControlName="username"
+              [class.error]="getFieldError(authForm, 'username')"
+              placeholder="Enter username"
+            />
+            @if (getFieldError(authForm, 'username')) {
+              <span class="error-message">{{ getFieldError(authForm, 'username') }}</span>
+            }
+          </div>
+
+          <div class="form-group">
+            <label for="password">Password:</label>
+            <input 
+              id="password"
+              type="password" 
+              formControlName="password"
+              [class.error]="getFieldError(authForm, 'password')"
+              placeholder="Enter password"
+            />
+            @if (getFieldError(authForm, 'password')) {
+              <span class="error-message">{{ getFieldError(authForm, 'password') }}</span>
+            }
+          </div>
+
+          <button type="submit" class="btn btn-primary" [disabled]="loading()">
+            {{ loading() ? 'Authenticating...' : 'Login' }}
+          </button>
+        </form>
+      </div>
+    </div>
+  } @else {
+    <!-- Main Portal Content -->
+    <div class="portal-content">
+      <header class="portal-header">
+        <h1>Mocking API Portal</h1>
+        <div class="header-actions">
+          <span class="user-info">Welcome!</span>
+          <button class="btn btn-secondary" (click)="onLogout()">Logout</button>
+        </div>
+      </header>
+
+      <!-- Message Alerts -->
+      @if (error()) {
+        <div class="alert alert-error">
+          <span class="alert-icon">⚠️</span>
+          <span>{{ error() }}</span>
+          <button class="alert-close" (click)="clearMessages()">×</button>
+        </div>
+      }
+      
+      @if (success()) {
+        <div class="alert alert-success">
+          <span class="alert-icon">✅</span>
+          <span>{{ success() }}</span>
+          <button class="alert-close" (click)="clearMessages()">×</button>
+        </div>
+      }
+
+      <!-- Navigation Tabs -->
+      <nav class="tab-navigation">
+        <button 
+          class="tab-button"
+          [class.active]="activeTab() === 'list'"
+          (click)="setActiveTab('list')"
+        >
+          Mock List
+        </button>
+        <button 
+          class="tab-button"
+          [class.active]="activeTab() === 'create'"
+          (click)="setActiveTab('create')"
+        >
+          {{ editingMock() ? 'Edit Mock' : 'Create Mock' }}
+        </button>
+        <button 
+          class="tab-button"
+          [class.active]="activeTab() === 'test'"
+          (click)="setActiveTab('test')"
+        >
+          Test Endpoint
+        </button>
+      </nav>
+
+      <!-- Mock List Tab -->
+      @if (activeTab() === 'list') {
+        <div class="tab-content">
+          <div class="list-header">
+            <h2>Mock Configurations</h2>
+            <button class="btn btn-primary" (click)="loadMockConfigurations()">
+              Refresh
+            </button>
+          </div>
+
+          @if (mockConfigurations().length === 0) {
+            <div class="empty-state">
+              <p>No mock configurations found. Create your first mock to get started!</p>
+            </div>
+          } @else {
+            <div class="mock-table-container">
+              <table class="mock-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Endpoint</th>
+                    <th>Method</th>
+                    <th>Status Code</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (mock of mockConfigurations(); track mock.id) {
+                    <tr>
+                      <td class="mock-name">{{ mock.name }}</td>
+                      <td class="mock-endpoint">
+                        <code>{{ mock.endpoint }}</code>
+                      </td>
+                      <td>
+                        <span class="method-badge" [attr.data-method]="mock.method">
+                          {{ mock.method }}
+                        </span>
+                      </td>
+                      <td>
+                        <span class="status-badge" [attr.data-status]="mock.statusCode">
+                          {{ mock.statusCode }}
+                        </span>
+                      </td>
+                      <td class="mock-description">{{ mock.description || '-' }}</td>
+                      <td class="actions">
+                        <button 
+                          class="btn btn-small btn-secondary" 
+                          (click)="editMock(mock)"
+                          title="Edit"
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          class="btn btn-small btn-danger" 
+                          (click)="deleteMock(mock.id!)"
+                          title="Delete"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Create/Edit Mock Tab -->
+      @if (activeTab() === 'create') {
+        <div class="tab-content">
+          <h2>{{ editingMock() ? 'Edit Mock Configuration' : 'Create Mock Configuration' }}</h2>
+          
+          <form [formGroup]="mockForm" (ngSubmit)="onSubmitMock()" class="mock-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="mockName">Name *</label>
+                <input 
+                  id="mockName"
+                  type="text" 
+                  formControlName="name"
+                  [class.error]="getFieldError(mockForm, 'name')"
+                  placeholder="Enter mock name"
+                />
+                @if (getFieldError(mockForm, 'name')) {
+                  <span class="error-message">{{ getFieldError(mockForm, 'name') }}</span>
+                }
+              </div>
+
+              <div class="form-group">
+                <label for="mockMethod">HTTP Method *</label>
+                <select 
+                  id="mockMethod"
+                  formControlName="method"
+                  [class.error]="getFieldError(mockForm, 'method')"
+                >
+                  @for (method of httpMethods; track method) {
+                    <option [value]="method">{{ method }}</option>
+                  }
+                </select>
+                @if (getFieldError(mockForm, 'method')) {
+                  <span class="error-message">{{ getFieldError(mockForm, 'method') }}</span>
+                }
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="mockEndpoint">Endpoint *</label>
+                <input 
+                  id="mockEndpoint"
+                  type="text" 
+                  formControlName="endpoint"
+                  [class.error]="getFieldError(mockForm, 'endpoint')"
+                  placeholder="/api/example"
+                />
+                @if (getFieldError(mockForm, 'endpoint')) {
+                  <span class="error-message">{{ getFieldError(mockForm, 'endpoint') }}</span>
+                }
+              </div>
+
+              <div class="form-group">
+                <label for="mockStatusCode">Status Code *</label>
+                <input 
+                  id="mockStatusCode"
+                  type="number" 
+                  formControlName="statusCode"
+                  [class.error]="getFieldError(mockForm, 'statusCode')"
+                  min="100" 
+                  max="599"
+                />
+                @if (getFieldError(mockForm, 'statusCode')) {
+                  <span class="error-message">{{ getFieldError(mockForm, 'statusCode') }}</span>
+                }
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="mockDescription">Description</label>
+              <textarea 
+                id="mockDescription"
+                formControlName="description"
+                placeholder="Optional description for this mock"
+                rows="2"
+              ></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="mockResponseData">Response Data (JSON) *</label>
+              <textarea 
+                id="mockResponseData"
+                formControlName="responseData"
+                [class.error]="getFieldError(mockForm, 'responseData')"
+                placeholder='{"message": "Hello World"}'
+                rows="6"
+              ></textarea>
+              @if (getFieldError(mockForm, 'responseData')) {
+                <span class="error-message">{{ getFieldError(mockForm, 'responseData') }}</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label for="mockHeaders">Headers (JSON)</label>
+              <textarea 
+                id="mockHeaders"
+                formControlName="headers"
+                placeholder='{"Content-Type": "application/json"}'
+                rows="3"
+              ></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn btn-secondary" (click)="resetMockForm()">
+                Reset
+              </button>
+              <button type="submit" class="btn btn-primary" [disabled]="loading()">
+                {{ loading() ? 'Saving...' : (editingMock() ? 'Update Mock' : 'Create Mock') }}
+              </button>
+            </div>
+          </form>
+        </div>
+      }
+
+      <!-- Test Endpoint Tab -->
+      @if (activeTab() === 'test') {
+        <div class="tab-content">
+          <h2>Test Mock Endpoint</h2>
+          
+          <form [formGroup]="testForm" (ngSubmit)="onTestEndpoint()" class="test-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="testEndpoint">Endpoint *</label>
+                <input 
+                  id="testEndpoint"
+                  type="text" 
+                  formControlName="endpoint"
+                  [class.error]="getFieldError(testForm, 'endpoint')"
+                  placeholder="/api/example"
+                />
+                @if (getFieldError(testForm, 'endpoint')) {
+                  <span class="error-message">{{ getFieldError(testForm, 'endpoint') }}</span>
+                }
+              </div>
+
+              <div class="form-group">
+                <label for="testMethod">HTTP Method *</label>
+                <select 
+                  id="testMethod"
+                  formControlName="method"
+                  [class.error]="getFieldError(testForm, 'method')"
+                >
+                  @for (method of httpMethods; track method) {
+                    <option [value]="method">{{ method }}</option>
+                  }
+                </select>
+                @if (getFieldError(testForm, 'method')) {
+                  <span class="error-message">{{ getFieldError(testForm, 'method') }}</span>
+                }
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="testData">Request Data (JSON)</label>
+              <textarea 
+                id="testData"
+                formControlName="testData"
+                placeholder='{"key": "value"}'
+                rows="4"
+              ></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary" [disabled]="loading()">
+              {{ loading() ? 'Testing...' : 'Test Endpoint' }}
+            </button>
+          </form>
+
+          @if (testResult()) {
+            <div class="test-result">
+              <h3>Test Result</h3>
+              <pre class="json-display">{{ testResult() | json }}</pre>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
